@@ -1,4 +1,5 @@
 import html
+import hashlib
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,7 +22,6 @@ MUTED = "#7C718A"    # 補助テキスト
 PLUM = "#8E6BE8"      # アクセント（ラベンダー）
 MILK = "#FFF7F5"      # 背景（ミルクピンク）
 
-# 状態ごとの色・表情・ひとこと
 STATUS = {
     "green": dict(main="#5CC9A0", soft="#E4F7EE", face="😊", title="いい調子！",
                   msg="このペースを保てるといいね。"),
@@ -41,17 +41,14 @@ FACTOR_EMOJI = {
 }
 PASTELS = ["#C9B6FF", "#FFC6D9", "#BFEBD7", "#FFE2A8", "#BFE0FF", "#FFD0B5"]
 
-# 全てのCSSスタイルを1つのst.markdownにまとめ、中括弧をエスケープ
 st.markdown(f"""
 <style>
-/* ---- ヘッダー ---- */
 .app-head {{ display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }}
 .app-emoji {{ width: 52px; height: 52px; border-radius: 18px; background: #F0E6FF;
     display: grid; place-items: center; font-size: 1.7rem; }}
 .app-title {{ font-size: 1.5rem; font-weight: 700; color: {INK}; line-height: 1.2; }}
 .app-sub {{ font-size: .85rem; color: {MUTED}; margin-top: 2px; }}
 
-/* ---- タブ（ピル型） ---- */
 .stTabs [data-baseweb="tab-list"] {{ gap: 4px; background: #fff; padding: 5px; border-radius: 99px;
     border: 2px solid #FFE3EA; }}
 .stTabs [data-baseweb="tab"] {{ flex: 1; height: 40px; border-radius: 99px; padding: 0 8px;
@@ -60,7 +57,6 @@ st.markdown(f"""
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display: none; }}
 .stTabs [data-baseweb="tab-panel"] {{ padding-top: 1.2rem; }}
 
-/* ---- ヒーローカード ---- */
 .hero {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 22px;
     border-radius: 32px; padding: 24px 20px; margin-bottom: 14px; }}
 .ring {{ width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; flex: none; }}
@@ -75,7 +71,6 @@ st.markdown(f"""
 .pill {{ display: inline-block; padding: 4px 14px; border-radius: 99px; background: #fff;
     font-size: .85rem; font-weight: 700; color: {INK}; }}
 
-/* ---- 歩数・睡眠カード ---- */
 .grid2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }}
 .stat {{ background: #fff; border: 2px solid #FFE9EF; border-radius: 22px; padding: 16px; }}
 .stat-head {{ display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }}
@@ -87,32 +82,27 @@ st.markdown(f"""
 .bar > i {{ display: block; height: 100%; border-radius: 99px; }}
 .stat-sub {{ font-size: .8rem; color: {MUTED}; }}
 
-/* ---- メモカード & タグ ---- */
 .memo {{ background: #fff; border: 2px dashed #E7D9F5; border-radius: 22px; padding: 16px 18px; margin-bottom: 14px; }}
 .memo-label {{ font-size: .85rem; font-weight: 700; color: {MUTED}; margin-bottom: 6px; }}
 .memo-text {{ font-size: 1rem; color: {INK}; line-height: 1.7; margin-bottom: 10px; }}
 .chip {{ display: inline-block; padding: 4px 12px; border-radius: 99px; background: #F0E6FF;
     font-size: .82rem; font-weight: 700; color: {INK}; }}
 
-/* ---- アラート ---- */
 .alert {{ border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; font-size: .95rem;
     line-height: 1.6; color: {INK}; }}
 .alert-warn {{ background: #FFE3EA; }}
 .alert-ok {{ background: #E4F7EE; }}
 
-/* ---- 予測・結果カード ---- */
 .result {{ border-radius: 26px; padding: 20px; margin: 6px 0 14px; }}
 .result-label {{ font-size: .85rem; font-weight: 700; color: {MUTED}; margin-bottom: 4px; }}
 .result-value {{ font-size: 2.2rem; font-weight: 700; color: {INK}; line-height: 1.1; }}
 .result-value small {{ font-size: .9rem; font-weight: 500; color: {MUTED}; }}
 .result-sub {{ margin-top: 10px; }}
 
-/* ---- 凡例 ---- */
 .legend {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }}
 .legend span {{ padding: 3px 12px; border-radius: 99px; font-size: .78rem; font-weight: 700; color: {INK}; }}
 .note {{ font-size: .78rem; color: {MUTED}; margin-top: 18px; text-align: center; }}
 
-/* ---- ウィジェット ---- */
 [data-testid="stSidebar"] {{ background: #FFEFF4; }}
 .stButton > button[kind="primary"], button[data-testid="stBaseButton-primary"] {{
     background: {PLUM}; border: none; border-radius: 99px; color: #fff; font-weight: 700; padding: .6rem 1rem; }}
@@ -124,11 +114,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
+# ---------------------------------------------------------
+# 2. 認証 & ロジック関数群
+# ---------------------------------------------------------
+def make_hash(password: str) -> str:
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
 def render(markup: str):
-    """インデントや空行でMarkdownに誤解されないようHTMLを整形して描画"""
     cleaned = "\n".join(line.strip() for line in markup.strip().splitlines() if line.strip())
     st.markdown(cleaned, unsafe_allow_html=True)
-
 
 def status_of(score: float) -> str:
     if score >= 70:
@@ -137,14 +131,9 @@ def status_of(score: float) -> str:
         return "orange"
     return "green"
 
-
 def fmt_date(d) -> str:
     return f"{d.month}/{d.day}"
 
-
-# ---------------------------------------------------------
-# 2. ロジック関数群
-# ---------------------------------------------------------
 def analyze_text_sentiment(text: str) -> float:
     if not text:
         return 0.0
@@ -158,7 +147,6 @@ def analyze_text_sentiment(text: str) -> float:
     if total == 0:
         return 0.0
     return (pos_count - neg_count) / total
-
 
 def classify_stress_factor(text: str) -> str:
     if not text:
@@ -174,7 +162,6 @@ def classify_stress_factor(text: str) -> str:
         return "体調・運動不足"
     else:
         return "その他・日常"
-
 
 def calculate_health_scores(steps: int, sleep: float, stress_level: int, memo: str):
     steps_score = min(100.0, (steps / 8000.0) * 100.0)
@@ -213,7 +200,6 @@ def calculate_health_scores(steps: int, sleep: float, stress_level: int, memo: s
         "factor": factor,
     }
 
-
 def detect_early_warnings(df: pd.DataFrame) -> list:
     warnings = []
     if len(df) >= 2 and all(df.iloc[-2:]["ストレス指標"] >= 60):
@@ -225,7 +211,6 @@ def detect_early_warnings(df: pd.DataFrame) -> list:
         if df.iloc[-3:]["歩数"].mean() < 4000:
             warnings.append("🚶‍♂️ 【運動不足】軽いストレッチや散歩をおすすめします。")
     return warnings
-
 
 def predict_tomorrow_stress(df: pd.DataFrame) -> dict:
     if len(df) < 3:
@@ -249,11 +234,90 @@ def predict_tomorrow_stress(df: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------
-# 3. データ初期化（サンプルなしのクリーンな状態からスタート）
+# 3. 認証データの初期化（ユーザーデータベース & データストア）
 # ---------------------------------------------------------
-if "df" not in st.session_state:
+if "users_db" not in st.session_state:
+    st.session_state.users_db = {}  # {"username": "hashed_password"}
+
+if "user_data_store" not in st.session_state:
+    st.session_state.user_data_store = {}  # {"username": DataFrame}
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+
+# ---------------------------------------------------------
+# 4. 未ログイン時の認証画面（ログイン / 新規登録）
+# ---------------------------------------------------------
+if not st.session_state.logged_in:
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0 1rem;">
+        <h2>🧘 ストレス分析ヘルスケア</h2>
+        <p style="color: #7C718A;">マイページをご利用いただくにはログインまたは新規登録が必要です。</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        auth_tab1, auth_tab2 = st.tabs(["🔑 ログイン", "✨ 新規登録"])
+
+        with auth_tab1:
+            st.subheader("ログイン")
+            login_user = st.text_input("ユーザー名", key="login_user")
+            login_pass = st.text_input("パスワード", type="password", key="login_pass")
+            
+            if st.button("ログインする", type="primary", use_container_width=True):
+                if login_user in st.session_state.users_db and st.session_state.users_db[login_user] == make_hash(login_pass):
+                    st.session_state.logged_in = True
+                    st.session_state.username = login_user
+                    st.success("ログインしました！")
+                    st.rerun()
+                else:
+                    st.error("ユーザー名またはパスワードが正しくありません。")
+
+        with auth_tab2:
+            st.subheader("新規アカウント作成")
+            new_user = st.text_input("新しいユーザー名", key="new_user")
+            new_pass = st.text_input("新しいパスワード", type="password", key="new_pass")
+            
+            if st.button("登録して始める", type="primary", use_container_width=True):
+                if not new_user or not new_pass:
+                    st.warning("ユーザー名とパスワードを入力してください。")
+                elif new_user in st.session_state.users_db:
+                    st.warning("このユーザー名はすでに使われています。")
+                else:
+                    # アカウント作成
+                    st.session_state.users_db[new_user] = make_hash(new_pass)
+                    # このユーザー専用の初期データを自動生成
+                    today = datetime.now().date()
+                    initial_entry = {
+                        "日付": today,
+                        "歩数": 0,
+                        "睡眠時間": 0.0,
+                        "主観ストレス度": 3,
+                        "メモ": "まだ記録がありません。サイドバーからきょうの記録を入力してみましょう！",
+                        "ストレス指標": 50.0,
+                        "リスク判定": "良好",
+                        "ストレス要因": "その他・特になし",
+                    }
+                    st.session_state.user_data_store[new_user] = pd.DataFrame([initial_entry])
+                    
+                    st.success("登録が完了しました！「🔑 ログイン」タブからログインしてください。")
+
+    st.stop()  # ログインするまで以下のメインアプリ処理に進まない
+
+
+# ---------------------------------------------------------
+# 5. ログイン済みユーザーごとのデータ取得・初期化
+# ---------------------------------------------------------
+current_user = st.session_state.username
+
+# まだデータストアにこのユーザーのデータがない場合のフォールバック
+if current_user not in st.session_state.user_data_store:
     today = datetime.now().date()
-    # 初回は架空のサンプルデータを入れず、今日の初期行1件のみにする
     initial_entry = {
         "日付": today,
         "歩数": 0,
@@ -264,11 +328,23 @@ if "df" not in st.session_state:
         "リスク判定": "良好",
         "ストレス要因": "その他・特になし",
     }
-    st.session_state.df = pd.DataFrame([initial_entry])
+    st.session_state.user_data_store[current_user] = pd.DataFrame([initial_entry])
+
+# 以降の処理は、ログイン中ユーザー専用のDataFrameを使う
+if "df" not in st.session_state:
+    st.session_state.df = st.session_state.user_data_store[current_user]
+
 
 # ---------------------------------------------------------
-# 4. サイドバー：日次データ入力フォーム
+# 6. サイドバー：日次データ入力フォーム & ログアウトボタン
 # ---------------------------------------------------------
+st.sidebar.markdown(f"👤 **ログイン中:** `{current_user}`")
+if st.sidebar.button("🚪 ログアウト", use_container_width=True):
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.header("📝 きょうの記録")
 input_date = st.sidebar.date_input("日付", datetime.now().date())
 input_steps = st.sidebar.number_input("歩数", min_value=0, max_value=50000, value=7000, step=500)
@@ -288,18 +364,22 @@ if st.sidebar.button("💾 保存する", type="primary", use_container_width=Tr
         "リスク判定": res["risk_level"],
         "ストレス要因": res["factor"],
     }
-    df = st.session_state.df
+    
+    # ユーザーごとのデータを更新
+    df = st.session_state.user_data_store[current_user]
     if input_date in df["日付"].values:
         df.loc[df["日付"] == input_date, :] = list(new_entry.values())
     else:
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-    st.session_state.df = df.sort_values("日付").reset_index(drop=True)
+    
+    st.session_state.user_data_store[current_user] = df.sort_values("日付").reset_index(drop=True)
     st.sidebar.success("保存しました！")
 
 # ---------------------------------------------------------
-# 5. メイン画面
+# 7. メイン画面
 # ---------------------------------------------------------
-latest_row = st.session_state.df.iloc[-1]
+user_df = st.session_state.user_data_store[current_user]
+latest_row = user_df.iloc[-1]
 latest_calc = calculate_health_scores(
     latest_row["歩数"], latest_row["睡眠時間"], latest_row["主観ストレス度"], latest_row["メモ"]
 )
@@ -308,7 +388,7 @@ render(f"""
 <div class="app-head">
 <div class="app-emoji">🧘</div>
 <div>
-<div class="app-title">ヘルスケア分析</div>
+<div class="app-title">ヘルスケア分析 ({current_user}さんのページ)</div>
 <div class="app-sub">最終記録：{fmt_date(latest_row['日付'])}</div>
 </div>
 </div>
@@ -371,51 +451,29 @@ with tab1:
 
     st.subheader("🔔 お知らせ・今日のアドバイス")
 
-    df_today = st.session_state.df.sort_values("日付")
+    df_today = user_df.sort_values("日付")
     latest_row = df_today.iloc[-1]
     warnings = detect_early_warnings(df_today)
 
     if warnings:
         for w in warnings:
-            render(
-                f'<div class="alert alert-warn">'
-                f'{html.escape(w)}</div>'
-            )
+            render(f'<div class="alert alert-warn">{html.escape(w)}</div>')
     else:
-        render(
-            '<div class="alert alert-ok">'
-            '✅ 大きな注意サインは検出されていません。'
-            '</div>'
-        )
+        render('<div class="alert alert-ok">✅ 大きな注意サインは検出されていません。</div>')
 
     advice = []
     if latest_row["ストレス指標"] >= 70:
-        advice.append(
-            "🌿 ストレス指標が高めです。"
-            "予定を詰め込みすぎず、ゆっくり休む時間を作りましょう。"
-        )
+        advice.append("🌿 ストレス指標が高めです。予定を詰め込みすぎず、ゆっくり休む時間を作りましょう。")
     elif latest_row["ストレス指標"] >= 45:
-        advice.append(
-            "☕ 少し疲れがたまっているかもしれません。"
-            "短い休憩や深呼吸で気分を切り替えてみましょう。"
-        )
+        advice.append("☕ 少し疲れがたまっているかもしれません。短い休憩や深呼吸で気分を切り替えてみましょう。")
     else:
-        advice.append(
-            "🌷 今の状態を保てるように、"
-            "無理のない生活リズムを続けてみましょう。"
-        )
+        advice.append("🌷 今の状態を保てるように、無理のない生活リズムを続けてみましょう。")
 
     if latest_row["睡眠時間"] < 6 and latest_row["睡眠時間"] > 0:
-        advice.append(
-            "🌙 睡眠時間が短めです。"
-            "今夜は早めに休めるようにしてみましょう。"
-        )
+        advice.append("🌙 睡眠時間が短めです。今夜は早めに休めるようにしてみましょう。")
 
     if latest_row["歩数"] < 4000 and latest_row["歩数"] > 0:
-        advice.append(
-            "🚶 歩数が少なめです。体調に合わせて、"
-            "軽いストレッチや短い散歩を取り入れてみましょう。"
-        )
+        advice.append("🚶 歩数が少なめです。体調に合わせて、軽いストレッチや短い散歩を取り入れてみましょう。")
 
     render(
         '<div class="alert alert-ok">'
@@ -432,7 +490,7 @@ with tab1:
 # ---------------------------------------------------------
 with tab2:
     st.subheader("🔮 明日のストレス予測")
-    pred = predict_tomorrow_stress(st.session_state.df)
+    pred = predict_tomorrow_stress(user_df)
     pc = STATUS[status_of(pred["predicted_score"])]
 
     render(f"""
@@ -469,7 +527,6 @@ with tab2:
 # ---------------------------------------------------------
 PLOT_CONFIG = {"displayModeBar": False}
 
-
 def base_layout(fig, height):
     fig.update_layout(
         font=dict(family=FONT, color=INK, size=13),
@@ -479,9 +536,8 @@ def base_layout(fig, height):
         height=height,
     )
 
-
 with tab3:
-    df_chart = st.session_state.df.copy()
+    df_chart = user_df.copy()
 
     st.subheader("🍰 ストレスの原因")
     factor_counts = df_chart["ストレス要因"].value_counts().reset_index()
@@ -532,95 +588,13 @@ with tab3:
     </div>
     """)
 
-    st.subheader("📊 主観ストレスとアプリ評価の比較")
-
-    df_compare = df_chart.sort_values("日付").copy()
-    df_compare["主観評価換算"] = (
-        (df_compare["主観ストレス度"] - 1) / 4 * 100
-    )
-
-    fig_compare = go.Figure()
-
-    fig_compare.add_trace(go.Scatter(
-        x=df_compare["日付"],
-        y=df_compare["主観評価換算"],
-        mode="lines+markers",
-        name="主観ストレス（換算）",
-        line=dict(color="#2563EB", width=3),
-        marker=dict(size=8),
-        customdata=df_compare["主観ストレス度"],
-        hovertemplate=(
-            "%{x|%m/%d}<br>"
-            "主観評価：%{customdata} / 5<br>"
-            "換算値：%{y:.1f} / 100"
-            "<extra></extra>"
-        ),
-    ))
-
-    fig_compare.add_trace(go.Scatter(
-        x=df_compare["日付"],
-        y=df_compare["ストレス指標"],
-        mode="lines+markers",
-        name="アプリ評価",
-        line=dict(color="#EA580C", width=3),
-        marker=dict(size=8),
-        hovertemplate=(
-            "%{x|%m/%d}<br>"
-            "アプリ評価：%{y:.1f} / 100"
-            "<extra></extra>"
-        ),
-    ))
-
-    base_layout(fig_compare, 380)
-    fig_compare.update_layout(
-        title=dict(
-            text="日ごとのストレス評価の比較",
-            x=0,
-            xanchor="left",
-            y=0.98,
-            yanchor="top",
-        ),
-        margin=dict(t=100, b=80),
-        xaxis_title="日付",
-        yaxis_title="ストレス評価",
-        legend=dict(
-            orientation="h",
-            y=-0.2,
-            x=0.5,
-            xanchor="center",
-        ),
-        hovermode="x unified",
-    )
-
-    fig_compare.update_yaxes(
-        range=[0, 100],
-        tickvals=[0, 25, 50, 75, 100],
-        gridcolor="rgba(75,63,94,.08)",
-        zeroline=False,
-    )
-    fig_compare.update_xaxes(
-        tickformat="%m/%d",
-        showgrid=False,
-    )
-
-    st.plotly_chart(
-        fig_compare,
-        use_container_width=True,
-        config=PLOT_CONFIG,
-    )
-
-    st.caption(
-        "主観評価は1～5の値を0～100に換算しています。"
-        "2本の線の推移を比較し、評価の違いを確認できます。"
-    )
-
 
 # ---------------------------------------------------------
 # Tab 4: 履歴データ
 # ---------------------------------------------------------
 with tab4:
     st.subheader("📒 これまでの記録")
-    df_view = st.session_state.df.sort_values("日付", ascending=False).copy()
+    df_view = user_df.sort_values("日付", ascending=False).copy()
     risk_icon = {"良好": "🟢 良好", "中リスク": "🟡 中リスク", "高リスク": "🔴 高リスク"}
     df_view["リスク判定"] = df_view["リスク判定"].map(risk_icon)
     df_view["ストレス要因"] = [f"{FACTOR_EMOJI.get(f, '☁️')} {f}" for f in df_view["ストレス要因"]]
